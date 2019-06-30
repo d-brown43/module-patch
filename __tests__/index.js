@@ -33,9 +33,28 @@ describe('accessing internal variables', () => {
 });
 
 describe('setting internal variables', () => {
-    it('lets you modify a basic variable', () => {
+    it('lets you modify const variables', () => {
         const module = mpatch('../test-file');
         module.__set__('internalFunction', () => 'new value');
         expect(module.__get__('internalFunction')()).toEqual('new value');
+    });
+
+    it('lets you modify let variables', () => {
+        const module = mpatch('../test-file');
+        module.__set__('internalLetFunction', 10);
+        expect(module.__get__('internalLetFunction')).toEqual(10);
+    });
+
+    it('lets you modify a function(?)', () => {
+        // TODO is this allowed?
+        const module = mpatch('../test-file');
+        module.__set__('otherInternalFunction', () => 'yeah its allowed');
+        expect(module.__get__('otherInternalFunction')()).toEqual('yeah its allowed');
+    });
+
+    it('lets you modify a function that is depended on', () => {
+        const module = mpatch('../test-file');
+        module.__set__('dependentFunction', () => 'i changed');
+        expect(module.__get__('dependingFunction')()).toEqual('i changed dependingFunction');
     });
 });

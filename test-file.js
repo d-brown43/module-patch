@@ -16,6 +16,14 @@ const somethingWeird = (() => {
 
 let somethingElse = internalFunction;
 
+const dependentFunction = () => {
+    return 'dependentFunction';
+};
+
+const dependingFunction = () => {
+    return `${ dependentFunction() } dependingFunction`;
+};
+
 exports.externalFunction = () => {
     return 'externalFunction';
 };
