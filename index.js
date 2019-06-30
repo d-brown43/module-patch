@@ -17,6 +17,7 @@ module.exports = (moduleName) => {
             tokenTypes.VariableDeclaration,
             tokenTypes.VariableDeclarator,
             tokenTypes.ExpressionStatement,
+            tokenTypes.FunctionDeclaration,
         ].includes(rootExpression.type)) {
             // console.log(JSON.stringify(rootExpression, null, 4));
             if (rootExpression.type === tokenTypes.VariableDeclaration) {
@@ -25,6 +26,10 @@ module.exports = (moduleName) => {
                         unexposedVariableNames.push(declaration.id.name);
                     }
                 });
+            }
+
+            if (rootExpression.type === tokenTypes.FunctionDeclaration) {
+                unexposedVariableNames.push(rootExpression.id.name);
             }
         }
     });
@@ -36,8 +41,8 @@ module.exports = (moduleName) => {
     wrapped += `exports.__get__ = function(variableName) {\n`;
 
     unexposedVariableNames.forEach((variableName) => {
-        wrapped += `if (variableName === '${variableName}') {
-            return ${variableName};
+        wrapped += `if (variableName === '${ variableName }') {
+            return ${ variableName };
         }
         `;
     });
