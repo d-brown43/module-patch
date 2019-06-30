@@ -1,0 +1,19 @@
+{
+  "name": "mpatch",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest --watch"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "jest": "^24.8.0"
+  },
+  "dependencies": {
+    "eslint": "^6.0.1",
+    "espree": "^6.0.0",
+    "require-from-string": "^2.0.2"
+  }
+}
