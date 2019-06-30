@@ -1,22 +1,22 @@
-const path = require('path');
 const fs = require('fs');
 const Module = require('module');
 const requireFromString = require('require-from-string');
 const espree = require('espree');
 const tokenTypes = require('espree/lib/ast-node-types');
 
-module.exports = (moduleName) => {
+const getFileContentSync = (moduleName) => {
     const resolvedFilepath = Module._resolveFilename(moduleName, module.parent);
-    const moduleContent = fs.readFileSync(resolvedFilepath).toString('utf-8');
+    return fs.readFileSync(resolvedFilepath).toString('utf-8');
+};
 
-    const unexposedVariableNames = [];
+const parseContent = (moduleContent) => {
+    return espree.parse(moduleContent, { ecmaVersion: 6 });
+};
 
-    espree.parse(moduleContent, { ecmaVersion: 6 }).body.forEach((rootExpression) => {
+const collectUnexposedFunctionsAndVariables = (ast) => {
+    return ast.body.reduce((unexposedVariableNames, rootExpression) => {
         if ([
-            tokenTypes.AssignmentExpression,
             tokenTypes.VariableDeclaration,
-            tokenTypes.VariableDeclarator,
-            tokenTypes.ExpressionStatement,
             tokenTypes.FunctionDeclaration,
         ].includes(rootExpression.type)) {
             // console.log(JSON.stringify(rootExpression, null, 4));
@@ -32,25 +32,72 @@ module.exports = (moduleName) => {
                 unexposedVariableNames.push(rootExpression.id.name);
             }
         }
-    });
+        return unexposedVariableNames;
+    }, []);
+};
 
-    // console.log(unexposedVariableNames);
-
-    let wrapped = `(function() {\n` + moduleContent;
-
-    wrapped += `exports.__get__ = function(variableName) {\n`;
+const wrapModuleWithGet = (unexposedVariableNames) => {
+    let result = '';
+    result += `exports.__get__ = function(variableName) {\n`;
 
     unexposedVariableNames.forEach((variableName) => {
-        wrapped += `if (variableName === '${ variableName }') {
+        result += `if (variableName === '${ variableName }') {
             return ${ variableName };
         }
         `;
     });
-    wrapped += `throw new Error(variableName + ' is not defined in the root scope');
+    result += `throw new Error(variableName + ' is not defined in the root scope');
     };
     `;
 
-    wrapped += '})();';
+    return result;
+};
+
+const wrapModuleWithSet = (unexposedVariableNames) => {
+    let result = `exports.__set__ = function(variableName, newValue) {
+    `;
+    unexposedVariableNames.forEach((variableName) => {
+        result += `if (variableName === '${ variableName }') {
+        ${ variableName } = newValue;
+        }
+        `;
+    });
+    result += `};
+    `;
+    return result;
+};
+
+function replaceRange(string, start, end, substitute) {
+    return string.substring(0, start) + substitute + string.substring(end);
+}
+
+const replaceConstWithLet = (moduleContent) => {
+    function helper(nodeIndex, ast, moduleContent) {
+        for (let i = nodeIndex; i < ast.body.length; i++) {
+            const rootNode = ast.body[i];
+            if (tokenTypes.VariableDeclaration === rootNode.type) {
+                if (rootNode.kind === 'const') {
+                    moduleContent = replaceRange(moduleContent, rootNode.start, rootNode.start + 'const'.length, 'let');
+                    return helper(i + 1, parseContent(moduleContent), moduleContent);
+                }
+            }
+        }
+        return moduleContent;
+    }
+
+    return helper(0, parseContent(moduleContent), moduleContent);
+};
+
+module.exports = (moduleName) => {
+    let moduleContent = getFileContentSync(moduleName);
+    const ast = parseContent(moduleContent);
+
+    const unexposedVariableNames = collectUnexposedFunctionsAndVariables(ast);
+    moduleContent = replaceConstWithLet(moduleContent);
+
+    let wrapped = moduleContent;
+    wrapped += wrapModuleWithGet(unexposedVariableNames);
+    wrapped += wrapModuleWithSet(unexposedVariableNames);
 
     return requireFromString(wrapped);
 };
