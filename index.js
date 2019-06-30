@@ -36,34 +36,38 @@ const collectUnexposedFunctionsAndVariables = (ast) => {
     }, []);
 };
 
-const wrapModuleWithGet = (unexposedVariableNames) => {
-    let result = '';
-    result += `exports.__get__ = function(variableName) {\n`;
+const addGetFunction = (unexposedVariableNames) => {
+    let result = `exports.__get__ = function(variableName) {`;
 
     unexposedVariableNames.forEach((variableName) => {
-        result += `if (variableName === '${ variableName }') {
-            return ${ variableName };
-        }
-        `;
+        result += `
+    if (variableName === '${ variableName }') {
+        return ${ variableName };
+    }
+`;
     });
-    result += `throw new Error(variableName + ' is not defined in the root scope');
-    };
-    `;
+    result += `
+    throw new Error(variableName + ' is not defined in the root scope');
+};
+`;
 
     return result;
 };
 
-const wrapModuleWithSet = (unexposedVariableNames) => {
-    let result = `exports.__set__ = function(variableName, newValue) {
-    `;
+const addSetFunction = (unexposedVariableNames) => {
+    let result = `exports.__set__ = function(variableName, newValue) {`;
     unexposedVariableNames.forEach((variableName) => {
-        result += `if (variableName === '${ variableName }') {
+        result += `
+    if (variableName === '${ variableName }') {
         ${ variableName } = newValue;
-        }
-        `;
+        return;
+    }
+`;
     });
-    result += `};
-    `;
+    result += `
+    throw new Error(variableName + ' is not defined in the root scope');
+};
+`;
     return result;
 };
 
@@ -96,8 +100,8 @@ module.exports = (moduleName) => {
     moduleContent = replaceConstWithLet(moduleContent);
 
     let wrapped = moduleContent;
-    wrapped += wrapModuleWithGet(unexposedVariableNames);
-    wrapped += wrapModuleWithSet(unexposedVariableNames);
+    wrapped += addGetFunction(unexposedVariableNames);
+    wrapped += addSetFunction(unexposedVariableNames);
 
     return requireFromString(wrapped);
 };
